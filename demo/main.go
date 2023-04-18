@@ -9,13 +9,38 @@ import (
 
 func main() {
 	var wg sync.WaitGroup
+	var receivedOrdersCh = make(chan order)
+	var validatedOrdersCh = make(chan order)
+	var invalidOrdersCh = make(chan invalidOrder)
+
+	go receiveOrders(receivedOrdersCh)
+	go validateOrders(receivedOrdersCh, validatedOrdersCh, invalidOrdersCh)
+
 	wg.Add(1)
-	go receiveOrders(&wg)
+	go func() {
+		order := <-validatedOrdersCh
+		fmt.Printf("Valid order received: %v", order)
+		wg.Done()
+	}()
+
+	go func() {
+		invalidOrder := <-invalidOrdersCh
+		fmt.Printf("Invalid order received: %v. Issue: %v\n", invalidOrder.order, invalidOrder.err)
+		wg.Done()
+	}()
 	wg.Wait()
-	fmt.Println(orders)
 }
 
-func receiveOrders(wg *sync.WaitGroup) {
+func validateOrders(in, out chan order, errCh chan invalidOrder) {
+	order := <-in
+	if order.Quantity < 0 {
+		errCh <- invalidOrder{order: order, err: fmt.Errorf("invalid quantity: %v. Quantity must be greater than zero", order.Quantity)}
+	} else {
+		out <- order
+	}
+}
+
+func receiveOrders(out chan order) {
 	for _, rawOrder := range rawOrder {
 		var newOrder order
 		err := json.Unmarshal([]byte(rawOrder), &newOrder)
@@ -23,9 +48,8 @@ func receiveOrders(wg *sync.WaitGroup) {
 			log.Printf("Error unmarshalling order: %v", err)
 			continue
 		}
-		orders = append(orders, newOrder)
+		out <- newOrder
 	}
-	wg.Done()
 }
 
 var rawOrder = []string{
