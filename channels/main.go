@@ -1,10 +1,5 @@
 package main
 
-import (
-	"fmt"
-	"sync"
-)
-
 /*
 // main function fails to run because of deadlock
 func main() {
@@ -32,6 +27,7 @@ func main() {
 }
 */
 
+/*
 // Directional channel
 // It is always the arrow facing towards the left
 func main() {
@@ -53,3 +49,6 @@ func main() {
 
 	wg.Wait()
 }
+
+*/
+
