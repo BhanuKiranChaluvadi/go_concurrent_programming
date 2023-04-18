@@ -18,11 +18,23 @@ func main() {
 
 	wg.Add(1)
 	go func(validatedOrdersCh <-chan order, invalidOrdersCh <-chan invalidOrder) {
-		select {
-		case order := <-validatedOrdersCh:
-			fmt.Printf("Valid order received: %v", order)
-		case invalidOrder := <-invalidOrdersCh:
-			fmt.Printf("Invalid order received: %v. Issue: %v\n", invalidOrder.order, invalidOrder.err)
+	loop:
+		for {
+			select {
+			case order, ok := <-validatedOrdersCh:
+				if ok {
+					fmt.Printf("Valid order received: %v", order)
+				} else {
+					break loop
+				}
+
+			case invalidOrder, ok := <-invalidOrdersCh:
+				if ok {
+					fmt.Printf("Invalid order received: %v. Issue: %v\n", invalidOrder.order, invalidOrder.err)
+				} else {
+					break loop
+				}
+			}
 		}
 		wg.Done()
 	}(validatedOrdersCh, invalidOrdersCh)
@@ -31,12 +43,15 @@ func main() {
 }
 
 func validateOrders(in <-chan order, out chan<- order, errCh chan<- invalidOrder) {
-	order := <-in
-	if order.Quantity < 0 {
-		errCh <- invalidOrder{order: order, err: fmt.Errorf("invalid quantity: %v. Quantity must be greater than zero", order.Quantity)}
-	} else {
-		out <- order
+	for order := range in {
+		if order.Quantity < 0 {
+			errCh <- invalidOrder{order: order, err: fmt.Errorf("invalid quantity: %v. Quantity must be greater than zero", order.Quantity)}
+		} else {
+			out <- order
+		}
 	}
+	close(out)
+	close(errCh)
 }
 
 func receiveOrders(out chan<- order) {
@@ -49,6 +64,7 @@ func receiveOrders(out chan<- order) {
 		}
 		out <- newOrder
 	}
+	close(out)
 }
 
 var rawOrder = []string{
