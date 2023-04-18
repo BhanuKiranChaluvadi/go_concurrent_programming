@@ -17,21 +17,22 @@ func main() {
 	go validateOrders(receivedOrdersCh, validatedOrdersCh, invalidOrdersCh)
 
 	wg.Add(1)
-	go func() {
+	go func(validatedOrdersCh <-chan order) {
 		order := <-validatedOrdersCh
 		fmt.Printf("Valid order received: %v", order)
 		wg.Done()
-	}()
+	}(validatedOrdersCh)
 
-	go func() {
+	go func(invalidOrdersCh <-chan invalidOrder) {
 		invalidOrder := <-invalidOrdersCh
 		fmt.Printf("Invalid order received: %v. Issue: %v\n", invalidOrder.order, invalidOrder.err)
 		wg.Done()
-	}()
+	}(invalidOrdersCh)
+
 	wg.Wait()
 }
 
-func validateOrders(in, out chan order, errCh chan invalidOrder) {
+func validateOrders(in <-chan order, out chan<- order, errCh chan<- invalidOrder) {
 	order := <-in
 	if order.Quantity < 0 {
 		errCh <- invalidOrder{order: order, err: fmt.Errorf("invalid quantity: %v. Quantity must be greater than zero", order.Quantity)}
@@ -40,7 +41,7 @@ func validateOrders(in, out chan order, errCh chan invalidOrder) {
 	}
 }
 
-func receiveOrders(out chan order) {
+func receiveOrders(out chan<- order) {
 	for _, rawOrder := range rawOrder {
 		var newOrder order
 		err := json.Unmarshal([]byte(rawOrder), &newOrder)
