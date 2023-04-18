@@ -1,7 +1,6 @@
 package main
 
-import "fmt"
-
+/*
 func main() {
 	ch1 := make(chan int, 1)
 	ch2 := make(chan string, 1)
@@ -28,3 +27,5 @@ func main() {
 		fmt.Println("No message received")
 	}
 }
+
+*/
