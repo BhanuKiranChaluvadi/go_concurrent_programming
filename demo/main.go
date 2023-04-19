@@ -18,22 +18,25 @@ func main() {
 	validatedOrdersCh, invalidOrdersCh := validateOrders(receivedOrdersCh)
 	reservedInventoryCh := reserveInventory(validatedOrdersCh)
 
-	wg.Add(2)
+	wg.Add(1)
 
 	go func(invalidOrdersCh <-chan invalidOrder) {
 		for order := range invalidOrdersCh {
-			fmt.Printf("Invalid order: %v, Error: %v", order.order, order.err)
+			fmt.Printf("Invalid order: %v, Error: %v\n", order.order, order.err)
 		}
 		wg.Done()
 	}(invalidOrdersCh)
 
-	go func(reservedInventoryCh <-chan order) {
-		for order := range reservedInventoryCh {
-			fmt.Printf("Inventory reserved for : %v", order)
-		}
-		wg.Done()
-	}(reservedInventoryCh)
-
+	const workers = 3
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func(reservedInventoryCh <-chan order) {
+			for order := range reservedInventoryCh {
+				fmt.Printf("Inventory reserved for : %v", order)
+			}
+			wg.Done()
+		}(reservedInventoryCh)
+	}
 	wg.Wait()
 }
 
@@ -86,6 +89,6 @@ func receiveOrders() <-chan order {
 var rawOrder = []string{
 	`{"ProductCode": 1111, "Quantity": 5, "Status": 1}`,
 	`{"ProductCode": 2222, "Quantity": 42.3, "Status": 1}`,
-	`{"ProductCode": 3333, "Quantity": 19, "Status": 1}`,
+	`{"ProductCode": 3333, "Quantity": -19, "Status": 1}`,
 	`{"ProductCode": 4444, "Quantity": 8, "Status": 1}`,
 }
