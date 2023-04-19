@@ -9,12 +9,13 @@ import (
 
 func main() {
 	var wg sync.WaitGroup
-	var receivedOrdersCh = make(chan order)
-	var validatedOrdersCh = make(chan order)
-	var invalidOrdersCh = make(chan invalidOrder)
+	// var receivedOrdersCh = make(chan order)
+	// var validatedOrdersCh = make(chan order)
+	// var invalidOrdersCh = make(chan invalidOrder)
 
-	go receiveOrders(receivedOrdersCh)
-	go validateOrders(receivedOrdersCh, validatedOrdersCh, invalidOrdersCh)
+	// go receiveOrders(receivedOrdersCh)
+	receivedOrdersCh := receiveOrders()
+	validatedOrdersCh, invalidOrdersCh := validateOrders(receivedOrdersCh)
 
 	wg.Add(1)
 	go func(validatedOrdersCh <-chan order, invalidOrdersCh <-chan invalidOrder) {
@@ -42,29 +43,38 @@ func main() {
 	wg.Wait()
 }
 
-func validateOrders(in <-chan order, out chan<- order, errCh chan<- invalidOrder) {
-	for order := range in {
-		if order.Quantity < 0 {
-			errCh <- invalidOrder{order: order, err: fmt.Errorf("invalid quantity: %v. Quantity must be greater than zero", order.Quantity)}
-		} else {
-			out <- order
+func validateOrders(in <-chan order) (<-chan order, <-chan invalidOrder) {
+	out := make(chan order)
+	errCh := make(chan invalidOrder, 1)
+	go func(out chan<- order, errCh chan<- invalidOrder) {
+		for order := range in {
+			if order.Quantity < 0 {
+				errCh <- invalidOrder{order: order, err: fmt.Errorf("invalid quantity: %v. Quantity must be greater than zero", order.Quantity)}
+			} else {
+				out <- order
+			}
 		}
-	}
-	close(out)
-	close(errCh)
+		close(out)
+		close(errCh)
+	}(out, errCh)
+	return out, errCh
 }
 
-func receiveOrders(out chan<- order) {
-	for _, rawOrder := range rawOrder {
-		var newOrder order
-		err := json.Unmarshal([]byte(rawOrder), &newOrder)
-		if err != nil {
-			log.Printf("Error unmarshalling order: %v", err)
-			continue
+func receiveOrders() <-chan order {
+	out := make(chan order)
+	go func(out chan<- order) {
+		for _, rawOrder := range rawOrder {
+			var newOrder order
+			err := json.Unmarshal([]byte(rawOrder), &newOrder)
+			if err != nil {
+				log.Printf("Error unmarshalling order: %v", err)
+				continue
+			}
+			out <- newOrder
 		}
-		out <- newOrder
-	}
-	close(out)
+		close(out)
+	}(out)
+	return out
 }
 
 var rawOrder = []string{
