@@ -40,13 +40,25 @@ func main() {
 
 func fillOrders(in <-chan order) <-chan order {
 	out := make(chan order)
-	go func(in <-chan order, out chan<- order) {
-		for order := range in {
-			order.Status = filled
-			out <- order
-		}
+
+	var wg sync.WaitGroup
+	const workers = 3
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(in <-chan order, out chan<- order) {
+			for order := range in {
+				order.Status = filled
+				out <- order
+			}
+			wg.Done()
+		}(in, out)
+	}
+
+	go func() {
+		wg.Wait()
 		close(out)
-	}(in, out)
+	}()
+
 	return out
 }
 
