@@ -9,17 +9,13 @@ import (
 
 func main() {
 	var wg sync.WaitGroup
-	// var receivedOrdersCh = make(chan order)
-	// var validatedOrdersCh = make(chan order)
-	// var invalidOrdersCh = make(chan invalidOrder)
 
-	// go receiveOrders(receivedOrdersCh)
 	receivedOrdersCh := receiveOrders()
 	validatedOrdersCh, invalidOrdersCh := validateOrders(receivedOrdersCh)
 	reservedInventoryCh := reserveInventory(validatedOrdersCh)
-	filledOrdersCh := fillOrders(reservedInventoryCh)
+	fillOrders(reservedInventoryCh, &wg)
 
-	wg.Add(2)
+	wg.Add(1)
 
 	go func(invalidOrdersCh <-chan invalidOrder) {
 		for order := range invalidOrdersCh {
@@ -28,38 +24,23 @@ func main() {
 		wg.Done()
 	}(invalidOrdersCh)
 
-	go func(filledOrdersCh <-chan order) {
-		for order := range filledOrdersCh {
-			fmt.Printf("Order has been completed: %v\n", order)
-		}
-		wg.Done()
-	}(filledOrdersCh)
-
 	wg.Wait()
 }
 
-func fillOrders(in <-chan order) <-chan order {
-	out := make(chan order)
+func fillOrders(in <-chan order, wg *sync.WaitGroup) {
 
-	var wg sync.WaitGroup
 	const workers = 3
+	wg.Add(workers)
+
 	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func(in <-chan order, out chan<- order) {
+		go func(in <-chan order) {
 			for order := range in {
 				order.Status = filled
-				out <- order
+				fmt.Printf("Order has been completed: %v\n", order)
 			}
 			wg.Done()
-		}(in, out)
+		}(in)
 	}
-
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-
-	return out
 }
 
 func reserveInventory(in <-chan order) <-chan order {
